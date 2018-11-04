@@ -44,6 +44,31 @@ namespace Leibniz
                 .SyntaxTree;
         }
 
+        public MethodDeclarationSyntax TransformToElementaryOperations(string methodName)
+        {
+            var methodNode = GetMethodSyntax(methodName);
+            var parameter = methodNode.ParameterList.Parameters.Single();
+
+            var returnStatement = methodNode.DescendantNodes()
+                .OfType<ReturnStatementSyntax>()
+                .Single();
+
+            var transformed = ToElementaryOperations(
+                returnStatement.Expression, parameter.Identifier);
+
+            var doubleType = ParseTypeName("double");
+            var tupleElement = TupleElement(doubleType);
+            var result = MethodDeclaration(
+                TupleType(SeparatedList(new[] { tupleElement, tupleElement })),
+                $"T_{methodName}")
+                .WithModifiers(methodNode.Modifiers)
+                .WithParameterList(methodNode.ParameterList)
+                .WithBody(Block(transformed))
+                .NormalizeWhitespace();
+
+            return result;
+        }
+
         private MethodDeclarationSyntax GetMethodSyntax(string methodName)
         {
             var methodSyntax = Model.SyntaxTree.GetRoot()
@@ -171,7 +196,7 @@ namespace Leibniz
         }
 
         private ExpressionSyntax DifferentiateSubtractExpression(
-            BinaryExpressionSyntax sub,   SyntaxToken x)
+            BinaryExpressionSyntax sub, SyntaxToken x)
         {
             var subleft = sub.Left;
             var subright = sub.Right;
@@ -230,7 +255,7 @@ namespace Leibniz
         {
             var innerDerivative = DifferentiateExpression(expression.Operand, x);
 
-            switch(expression.Kind())
+            switch (expression.Kind())
             {
                 case SyntaxKind.UnaryPlusExpression:
                 case SyntaxKind.UnaryMinusExpression:
@@ -238,6 +263,30 @@ namespace Leibniz
                 default:
                     throw new ArgumentException($"Unexpected syntax kind: {expression.Kind()}");
             }
+        }
+
+        public SyntaxList<StatementSyntax> ToElementaryOperations(
+            ExpressionSyntax expression, SyntaxToken x)
+        {
+            var kind = expression.Kind();
+
+            var result = new SyntaxList<StatementSyntax>();
+
+            switch (kind)
+            {
+                case SyntaxKind.NumericLiteralExpression:
+                    var list = new SeparatedSyntaxList<ArgumentSyntax>();
+                    list = list.Add(Argument(1.0.ToLiteral()));
+                    list = list.Add(Argument(0.0.ToLiteral()));
+                    result = result.Add(
+                        ReturnStatement(
+                            TupleExpression(list)));
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+            return result;
         }
     }
 }

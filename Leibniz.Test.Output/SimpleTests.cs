@@ -47,5 +47,10 @@ namespace Leibniz.Test.Output
         {
             return Math.Exp(Math.Sin(2 * x)) * Math.Cos(2 * x) * 2;
         }
+
+        public (double, double) T_Const(double x)
+        {
+            return (1, 0);
+        }
     }
 }

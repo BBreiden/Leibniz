@@ -35,14 +35,14 @@ namespace Leibniz.Test
         public void CallMath(string functionName)
             => DoTestSimpleExpressions(functionName);
 
+        [TestMethod]
+        [DataRow("Const")]
+        public void TestTransformToElementary(string functionName)
+            => DoTestTransformToElementaryOperations(functionName);
 
         public void DoTestSimpleExpressions(string functionName)
         {
-            var inputTree = Helpers.SyntaxTreeFromFile(TestFileName);
-            var Mscorlib = MetadataReference.CreateFromFile(Constants.MsCorLibDll);
-            var comp = CSharpCompilation.Create("test", new[] { inputTree })
-                .AddReferences(Mscorlib);
-            var model = comp.GetSemanticModel(inputTree);
+            var model = GetSematicModel();
 
             var diffOperator = new Differentiator(model);
             var transformed = diffOperator.Transform(functionName);
@@ -58,6 +58,33 @@ namespace Leibniz.Test
             var results = comparer.Compare(expectedTree, transformed);
 
             IsTrue(results.AreEqual, results.DifferencesString);
+        }
+
+        private static SemanticModel GetSematicModel()
+        {
+            var inputTree = Helpers.SyntaxTreeFromFile(TestFileName);
+            var Mscorlib = MetadataReference.CreateFromFile(Constants.MsCorLibDll);
+            var comp = CSharpCompilation.Create("test", new[] { inputTree })
+                .AddReferences(Mscorlib);
+            var model = comp.GetSemanticModel(inputTree);
+            return model;
+        }
+
+        public void DoTestTransformToElementaryOperations(string functionName)
+        {
+            var model = GetSematicModel();
+
+            var diffOperator = new Differentiator(model);
+            var transformed = diffOperator.TransformToElementaryOperations(functionName);
+
+            var outputTree = Helpers.SyntaxTreeFromFile(OutputFileName);
+            var expectedTree = outputTree.GetRoot().DescendantNodes()
+                .OfType<MethodDeclarationSyntax>()
+                .Where(m => m.Identifier.Value.ToString() == ("T_" + functionName))
+                .Select(m => m.NormalizeWhitespace())
+                .Single();
+
+            AreEqual(expectedTree.ToFullString(), transformed.ToFullString());
         }
     }
 }
